@@ -6,6 +6,7 @@
 (define-constant err-subscription-not-found (err u3))
 (define-constant err-already-subscribed (err u4))
 (define-constant err-subscription-expired (err u5))
+(define-constant err-invalid-input (err u6))
 
 ;; Subscription Struct
 (define-map subscriptions 
@@ -41,6 +42,14 @@
   (annual-price uint))
   (begin
     (asserts! (is-eq tx-sender contract-owner) err-unauthorized)
+    ;; Check for valid service-id (assuming max 1000 services)
+    (asserts! (< service-id u1000) err-invalid-input)
+    ;; Check name and description length
+    (asserts! (and (> (len name) u0) (<= (len name) u50)) err-invalid-input)
+    (asserts! (and (> (len description) u0) (<= (len description) u200)) err-invalid-input)
+    ;; Check for reasonable price bounds (assuming max price of 1,000,000 STX)
+    (asserts! (and (> monthly-price u0) (<= monthly-price u1000000)) err-invalid-input)
+    (asserts! (and (> annual-price u0) (<= annual-price u1000000)) err-invalid-input)
     (map-set services 
       { service-id: service-id }
       {
@@ -66,6 +75,8 @@
                            (* u6570 u1)  ;; Approximately 1 year (6570 blocks)
                            (* u720 u1))) ;; Approximately 1 month (720 blocks)
     )
+    ;; Check for valid service-id
+    (asserts! (< service-id u1000) err-invalid-input)
     ;; Check if user is already subscribed
     (asserts! 
       (is-none (map-get? subscriptions 
@@ -114,6 +125,8 @@
                            (* u6570 u1)  ;; Approximately 1 year
                            (* u720 u1))) ;; Approximately 1 month
     )
+    ;; Check for valid service-id
+    (asserts! (< service-id u1000) err-invalid-input)
     ;; Validate subscription
     (asserts! 
       (>= (get end-block subscription) current-block) 

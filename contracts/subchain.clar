@@ -1,4 +1,4 @@
-;; Decentralized Subscription Management Contract
+;; SubChain Decentralized Subscription Management Contract
 
 (define-constant contract-owner tx-sender)
 (define-constant err-unauthorized (err u1))
@@ -14,8 +14,8 @@
     service-id: uint 
   }
   {
-    start-time: uint,
-    end-time: uint,
+    start-block: uint,
+    end-block: uint,
     tier: (string-ascii 20),
     auto-renew: bool
   }
@@ -61,13 +61,10 @@
   (let 
     (
       (service (unwrap! (map-get? services { service-id: service-id }) err-subscription-not-found))
-      (price (if is-annual 
-                 (get annual-price service)
-                 (get monthly-price service)))
-      (duration (if is-annual 
-                    (* u365 u86400) 
-                    (* u30 u86400)))
-      (current-time block-timestamp)
+      (current-block block-height)
+      (block-duration (if is-annual 
+                           (* u6570 u1)  ;; Approximately 1 year (6570 blocks)
+                           (* u720 u1))) ;; Approximately 1 month (720 blocks)
     )
     ;; Check if user is already subscribed
     (asserts! 
@@ -85,8 +82,8 @@
         service-id: service-id 
       }
       {
-        start-time: current-time,
-        end-time: (+ current-time duration),
+        start-block: current-block,
+        end-block: (+ current-block block-duration),
         tier: (if is-annual "annual" "monthly"),
         auto-renew: true
       }
@@ -101,6 +98,7 @@
   (service-id uint))
   (let 
     (
+      (current-block block-height)
       (subscription (unwrap! 
         (map-get? subscriptions 
           { 
@@ -112,14 +110,13 @@
         (map-get? services 
           { service-id: service-id }) 
         err-subscription-not-found))
-      (current-time block-timestamp)
-      (duration (if (is-eq (get tier subscription) "annual")
-                    (* u365 u86400)
-                    (* u30 u86400)))
+      (block-duration (if (is-eq (get tier subscription) "annual")
+                           (* u6570 u1)  ;; Approximately 1 year
+                           (* u720 u1))) ;; Approximately 1 month
     )
     ;; Validate subscription
     (asserts! 
-      (>= (get end-time subscription) current-time) 
+      (>= (get end-block subscription) current-block) 
       err-subscription-expired)
     
     ;; Update subscription
@@ -129,8 +126,8 @@
         service-id: service-id 
       }
       {
-        start-time: current-time,
-        end-time: (+ current-time duration),
+        start-block: current-block,
+        end-block: (+ current-block block-duration),
         tier: (get tier subscription),
         auto-renew: true
       }
@@ -150,7 +147,7 @@
             service-id: service-id 
           })
     subscription 
-      (>= (get end-time subscription) block-timestamp)
+      (>= (get end-block subscription) block-height)
     false)
 )
 
